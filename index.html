@@ -4,17 +4,17 @@
 	<head>
 		<meta charset="utf-8">
 
-		<title>Your Title</title>
+		<title>DRCM Mosaic Processing</title>
 
-		<meta name="description" content="Your description">
-		<meta name="author" content="Your Name">
+		<meta name="description" content="DRCM on big images">
+		<meta name="author" content="Robert Denham">
 
 		<meta name="apple-mobile-web-app-capable" content="yes" />
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-		<link rel="stylesheet" href="css/reveal.min.css">
+		<link rel="stylesheet" href="css/reveal.css">
 		<link rel="stylesheet" href="css/theme/default.css" id="theme">
 
 		<!-- For syntax highlighting -->
@@ -43,35 +43,164 @@
 </section>
 <section data-markdown>
     <script type="text/template">
-        ## Testing Markdown
+        Problem:
+        --------
+        * Wanted to know how many valid seasons per pixel in NT/Qld
+        * Too lazy to recall images, count pixels, mosaic and summarise
+        * _Why not use the Seasonal Fractional Cover Mosaics?_
+        * With rios, how hard can that be?
 
-        This _should_ be __bold__ and this should be a [link](https://github.com/mbrochh/reveal-template).
-
-        ### Heading 3
-
-        * A list
-        * With three
-        * items
     </script>
 </section>
+
+<section data-markdown>
+  <script type="text/template">
+    Plotted time vs file size.
+    ![Alt text](http://i.imgur.com/Jhh6R2n.png "time vs size")
+  </script>
+</section>
+
+
+<section data-markdown>
+  <script type="text/template">
+    Plotted time vs file size.
+    ![Alt text](http://i.imgur.com/1Qf7y6E.png "time vs size")
+  </script>
+</section>
+
+<section data-markdown>
+  <script type="text/template">
+    Plotted time vs file size.
+    ![Alt text](http://i.imgur.com/7QCH1Pt.png "time vs size")
+  </script>
+</section>
+
 <section>
-    <h2>Testing code snippets</h2>
+    <h2>Be Careful with Both creation options and rios options</h2>
     <pre><code>
-    import os
-    path = os.path.join('foo', 'bar')
-    def do_something(path):
-        return path
+    controls = applier.ApplierControls()
+    controls.setOutputDriverName('GTiff')
+    options = ['COMPRESS=LZW', 'BIGTIFF=YES', 'TILED=YES', 
+               'INTERLEAVE=BAND', 
+               'BLOCKXSIZE=256', 'BLOCKYSIZE=256']
+    controls.setCreationOptions(options)                                      
+    controls.setWindowXsize(256)
+    controls.setWindowYsize(256)
     </code></pre>
 </section>
 
 <section data-markdown>
-  Another Heading
-  ---------------
-  with an image:
+  ![Alt text](http://i.imgur.com/5vYgD9l.png "no. of seasons")
+</section>
 
-  ![Alt text](http://i.imgur.com/a4iVn2H.png "some random image")
+<section data-markdown>
+  ![Alt text](http://i.imgur.com/4n80Sui.png "no. of seasons")
+  median no. of seasons is 92 (66,105). Maximum possible is 112.
+</section>
 
 
+<section data-markdown>
+    <script type="text/template">
+        ## Writing in c
+        * faster (up to 10x)
+        * more difficult (but with mosaics not _that_ difficult)
+        * All mosaics same size (usually), same grid
+        * seaonal ones masked and ready to go.
+    </script>
+</section>
+
+
+<section data-markdown>
+    <script type="text/template">
+        ## Useful for DRCM
+        * uses a huge (1501x1501) smoothing window
+        * edge effects potentially large
+        * complicates division and mosaicing of tiles.
+        * convenient if we can do in one go
+    </script>
+</section>
+
+<section>
+    See <a href="http://www.gdal.org/gdal_tutorial.html">gdal_tutorial.html</a>
+    for examples of gdal and c.
+    <pre><code class="c">
+    // assume all bands same size
+    nXSize = GDALGetRasterBandXSize( fifthPercentileBand ); 
+    nYSize = GDALGetRasterBandYSize( fifthPercentileBand ); 
+
+    printf("allocation size: %lu\n",
+          (unsigned long)nYSize* (unsigned long)nXSize*sizeof(uint8_t));
+    
+    // Allocate space
+    pafScanline = (uint8_t *) CPLMalloc(nYSize*nXSize*sizeof(uint8_t));
+    dixScanline = (uint8_t *) CPLMalloc(nYSize*nXSize*sizeof(uint8_t));
+    refPixelScanline = (uint8_t *) CPLMalloc(nYSize*nXSize*sizeof(uint8_t));
+
+    /* and read the whole thing in */
+    GDALRasterIO(fifthPercentileBand , GF_Read, 0, 0, nXSize, nYSize,
+		 pafScanline, nXSize, nYSize,  GDT_Byte,
+		 0, 0 );
+    GDALRasterIO(dixImageBand , GF_Read, 0, 0, nXSize, nYSize,
+		 dixScanline, nXSize, nYSize,  GDT_Byte,
+		 0, 0 );
+
+    /* Create output */
+    hDstDS = GDALCreate( hDriver, pszDstFilename, nXSize, nYSize, 1, GDT_Byte, 
+                         papszOptions );
+    destBand = GDALGetRasterBand( hDstDS, 1 );
+    </code></pre>
+</section>
+
+
+<section data-markdown>
+    <script type="text/template">
+        ## Useful for DRCM
+        * requires estimate of 5th percentile of cover
+        * use 100 dix seasons (summer 1987 to sprint 2012)
+        * each dix about 3.7Gig in size
+        * process in c
+        * took 3hrs 45 minutes, used about 1.2gig of ram
+    </script>
+</section>
+
+
+<section data-markdown>
+  [fullsize](http://i.imgur.com/UiFIO14.png)
+  ![Alt text](http://i.imgur.com/UiFIO14.png "lowest 5th percentile")
+</section>
+
+
+<section data-markdown>
+    <script type="text/template">
+        ## Useful for DRCM
+        * DRCM reference pixel takes longer
+        * have to move through image pixel by pixel
+        * ~ 15hours. Used about 8gig
+    </script>
+</section>
+
+
+<section data-markdown>
+  [fullsize](http://i.imgur.com/nk5KeZl.png)
+  ![Alt text](http://i.imgur.com/nk5KeZl.png "reference pixel")
+</section>
+
+
+<section data-markdown>
+    <script type="text/template">
+        ## Useful for DRCM
+        * writing in c a possibiliy
+          * quick routines still best in python
+          * easier to maintain, read, fix
+        * but some situations c might be good:
+
+> We should forget about small efficiencies, say about 97% of the time:
+> premature optimization is the root of all evil. Yet we should not pass
+> up our opportunities in that critical 3%.
+
+**(Donald Knuth)**
+
+    </script>
 </section>
 
 
@@ -91,9 +220,7 @@
 				progress: true,
 				history: true,
 				center: true,
-
-				theme: Reveal.getQueryHash().theme, // available themes are in /css/theme
-				transition: Reveal.getQueryHash().transition || 'default', // default/cube/page/concave/zoom/linear/fade/none
+				transition: 'linear',                // default/cube/page/concave/zoom/linear/fade/none
 
 				// Optional libraries used to extend on reveal.js
 				dependencies: [
